@@ -1,0 +1,43 @@
+clc
+clear all
+close all
+
+load('without_optimization_result_cell.mat')
+load('without_optimization_p12.mat')
+load('without_optimization_p3.mat')
+load('without_optimization_p.mat')
+load('optimization_result_cell.mat')
+
+%% 东
+optimized_power_total=optimization_result_cell{1,7}.get_farm_power;
+optimized_power_12=optimization_result_cell{1,7}.get_farm_qingzhou12_power;
+optimized_power_3=optimization_result_cell{1,7}.get_farm_qingzhou3_power;
+
+op=[optimized_power_12;optimized_power_3;optimized_power_total]./10^6;
+% formatted = arrayfun(@(x) sprintf('%.4f', x), op, 'UniformOutput', false);
+
+wop=[without_optimization_p12(7);without_optimization_p3(7);without_optimization_p(7)]./10^6;
+formatted = arrayfun(@(x) sprintf('%.4f', x), wop, 'UniformOutput', false);
+
+%% 优化前后青州12功率提升
+qz_12_optimized=optimized_power_12-without_optimization_p12(7);
+qz_12_optimized_percentage=qz_12_optimized./without_optimization_p12(7)*100;
+
+
+%% 优化前后青州3功率提升
+qz_3_optimized=optimized_power_3-without_optimization_p3(7);
+qz_3_optimized_percentage=qz_3_optimized./without_optimization_p3(7)*100;
+
+
+
+%% 优化前后整个场群的功率提升
+qz_optimized=optimized_power_total-without_optimization_p(7);
+qz_optimized_percentage=qz_optimized./without_optimization_p(7)*100;
+
+pp=[qz_12_optimized_percentage;qz_3_optimized_percentage;qz_optimized_percentage];
+% formatted = arrayfun(@(x) sprintf('%.4f', x), pp, 'UniformOutput', false);
+
+
+
+
+
