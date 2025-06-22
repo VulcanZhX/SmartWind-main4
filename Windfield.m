@@ -260,7 +260,7 @@ classdef Windfield < handle
         end
       
 
-        %% 识别不受其他风机尾流影响的风机
+        %% 识别不受其他风机尾流影响的风机 
         function not_affecting_turbines=calculate_affturbines(obj)
             u_init=obj.u_initial;                                                                   %%所有网格点处的初始风速
             obj.u=u_init; 

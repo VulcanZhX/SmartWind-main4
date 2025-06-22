@@ -781,6 +781,9 @@ classdef SmartWindInterface_yaw <handle
             maximum_yaw_angle=obj.yaw_upper;
 
             indexes=1:1:length(obj.layout_x);
+            % Note: Does the custom 'Huadian' wake model leads to
+            % calculation failure? (all turbines are not affected... Fxxk)
+            % Temporary fix: disable calculating non-affected turbines.
             not_affecting_turbines=obj.windfield.calculate_affturbines();
             n_turbs=length(indexes)-length(not_affecting_turbines);
             if n_turbs == 0
