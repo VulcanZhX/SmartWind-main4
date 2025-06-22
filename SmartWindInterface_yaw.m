@@ -356,12 +356,12 @@ classdef SmartWindInterface_yaw <handle
         %produced by each turbine. It has to be called after the wake
         %calculation or yaw optimization.
 
-        %% 存储整个风场的平均寿命
-        function total_life=get_farm_life(obj)
+        %% 存储整个风场的平均寿命系数
+        function total_life=get_farm_life_coeff(obj)
             life_cell=zeros(length(obj.layout_x),1);
             for i=1:length(obj.layout_x)
                 life_cell(i)=obj.windfield.turbinechart.turbines...
-                    {i,1}.life;
+                    {i,1}.comprehensive_fatigue_coefficient;
             end
             total_life=sum(life_cell)/length(obj.layout_x);
         end
@@ -686,57 +686,9 @@ classdef SmartWindInterface_yaw <handle
             end
         end
   
-%%%%%%%%%%%%%%%%%%%%%%%%OPTIMIZATION_PART%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
-
-        %YAW_OPTIMIZATION_GB is a function that uses the SQP algorithm
-        %(gradient-based) to find the best configuration of yaw_angles to 
-        %maximize power. The drawbacks of this optimization method are the
-        %longer computational time if the number of turbine rises and the
-        %risk to encounter local minima for some configurationsthat could 
-        %not output the maximum power.
-
-       % %% 利用基于梯度的方法来优化各风机的偏航角度
-       %  function opt_yaw_angles = yaw_optimization_gb(obj)
-       %      minimum_yaw_angle=obj.ya_lower; %偏航角约束
-       %      maximum_yaw_angle=obj.ya_upper; %偏航角约束
-       %      indexes=1:1:length(obj.layout_x); %所有风机的索引
-       %      not_affecting_turbines=obj.windfield.calculate_affturbines(); %影响其他风机的风机
-       %      n_turbs=length(indexes)-length(not_affecting_turbines); %影响其他风机的风机个数 
-       %      if n_turbs == 0
-       %         opt_yaw_angles=zeros(1,length(indexes)); %如果所有风机的尾流都不影响其他风机，那么所有风机的偏航角度都为0，返回所有风机的偏航角度
-       %         return
-       %      end
-       %      for i=1:length(not_affecting_turbines) %从所有风机中除去不影响其他风机的索引，留下尾流对其他风机有影响的风机的索引
-       %          pos=indexes==not_affecting_turbines(i);
-       %          indexes(pos)=[];
-       %      end
-       %      opts = optimoptions('fmincon','Algorithm','sqp',...
-       %          'StepTolerance',10^(-3));
-       %      %x0=25*rand(1,n_turbs);
-       %      x0=repelem(12,n_turbs);%12个n_turbs
-       %      %x0=obj.get_yaw_angles;
-       %      fun=@(x)obj.cost_function(x,indexes);
-       %      A=[];
-       %      b=[];
-       %      Aeq=[];
-       %      beq=[];
-       %      lb=repelem(minimum_yaw_angle,n_turbs);%%每台风机偏航角的下界
-       %      ub=repelem(maximum_yaw_angle,n_turbs);%%每台风机偏航角的上界         
-       %      nonlcon=[];%没有非线性约束
-       %      opt_yaw_angles_partial=fmincon(fun,x0,A,b,Aeq,beq,lb,ub,...
-       %      nonlcon,opts);%求解优化问题，不含等式约束，优化变量是所有风机的偏航角度
-       %      opt_yaw_angles=zeros(length(obj.layout_x),1);
-       %      for i=1:length(indexes)
-       %          opt_yaw_angles(indexes(i))=opt_yaw_angles_partial(i);
-       %      end
-       %      obj.set_yaw_angles(opt_yaw_angles);
-       %      %opt_yaw_angles=round(opt_yaw_angles);
-       %      %obj.set_yaw_angles(opt_yaw_angles);
-       %      obj.calculate_wake();
-       %  end
-
-        %% 利用基于梯度的方法来优化各风机的轴向诱导因子
-        function opt_yaw_angles = yaw_optimization_gb(obj,qingzhou12_power_limit,qingzhou3_power_limit,y2)
+%%%%%%%%%%%%%%%%%%%%%%%%OPTIMIZATION_PART%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        %% 利用基于梯度的方法来优化各风机的偏航角度
+        function opt_yaw_angles = yaw_optimization_gb(obj,qingzhou12_power_limit,qingzhou3_power_limit)
             minimum_yaw=obj.yaw_lower; %偏航角约束
             maximum_yaw=obj.yaw_upper; %偏航角约束
             indexes=1:1:length(obj.layout_x); %所有风机的索引
@@ -751,15 +703,15 @@ classdef SmartWindInterface_yaw <handle
             %     indexes(pos)=[];
             % end
             opts = optimoptions('fmincon', ...
-    'Algorithm', 'interior-point', ...
-    'MaxFunctionEvaluations', 1e5, ...
-    'StepTolerance', 1e-3, ...              
-    'ConstraintTolerance', 0, ...
-    'OptimalityTolerance', 1e-6, ...
-    'Display', 'iter', ...
-    'ScaleProblem', true, ...
-    'MaxIterations', 20, ...
-    'HonorBounds', true);          
+                'Algorithm', 'interior-point', ...
+                'MaxFunctionEvaluations', 1e5, ...
+                'StepTolerance', 1e-3, ...              
+                'ConstraintTolerance', 0, ...
+                'OptimalityTolerance', 1e-6, ...
+                'Display', 'iter', ...
+                'ScaleProblem', true, ...
+                'MaxIterations', 20, ...
+                'HonorBounds', true);          
            % 
 
             %x0=
@@ -787,8 +739,90 @@ classdef SmartWindInterface_yaw <handle
             obj.calculate_wake();
         end
 
+        %%%%%%%%%%%%YAW_OPTIMIZATION_PSO_GB_TRACKING%%%%%%%%%
+        function opt_yaw_angles = yaw_optimization_pso_tracking_life_opt(obj, qingzhou12_power_limit,qingzhou3_power_limit)
 
+            % NOTE: 假设所有风机都参与计算
+            minium_yaw = obj.yaw_lower; %偏航角约束
+            maximum_yaw = obj.yaw_upper; %偏航角约束
+            rng default
+            fun_tracking = @(x)obj.rel_cost_function(x, qingzhou12_power_limit,qingzhou3_power_limit); %相对成本函数
+            nvars = length(obj.layout_x); %风机个数=159
+            lb = repelem(minium_yaw, nvars); %每台风机偏航角的下界
+            ub = repelem(maximum_yaw, nvars); %每台风机偏航角的上界
+            opt_pso = optimoptions('particleswarm', ...
+                'SwarmSize', 20, ... %粒子群大小
+                'MaxIterations', 100, ... %最大迭代次数
+                'Display', 'iter', ... %显示迭代信息
+                'FunctionTolerance', 1e-6);
+            yaw_optim_pso_res = particleswarm(fun_tracking, nvars, lb, ub, opt_pso); %粒子群优化
+            
+            % 优化寿命
+            x0 = yaw_optim_pso_res; %初始粒子位置为优化后的偏航角
+            fun_life = @(x)obj.life_cost_function(x); %寿命成本函数
+            A = []; b = []; 
+            Aeq = []; beq = []; 
+            nonlcon = @(x)obj.nonlincon(x,qingzhou12_power_limit,qingzhou3_power_limit); %非线性约束
+            opts_gb = optimoptions('fmincon', ...
+                'Algorithm', 'interior-point', ...
+                'StepTolerance', 1e-3, ...              % 增大容忍度避免过早收敛
+                'ConstraintTolerance', 1e-5, 'OptimalityTolerance', 1e-5, ...
+                'Display', 'iter', 'ScaleProblem', true, ...
+                'MaxIterations', 32, 'HonorBounds', true);
+            opt_yaw_angles = fmincon(fun_life, x0, A, b, Aeq, beq, lb, ub, nonlcon, opts_gb); %最小化寿命成本函数
+            obj.set_yaw_angles(opt_yaw_angles);
+            obj.calculate_wake();
+            
+        end
 
+        %%%%%%%%%%YAW_OPTIMIZATION_PSO_GB%%%%%%%%%%%%%%%%
+        function opt_yaw_angles = yaw_optimization_pso_gb(obj, qingzhou12_power, qingzhou3_power)
+            minimum_yaw_angle=obj.yaw_lower;
+            maximum_yaw_angle=obj.yaw_upper;
+
+            indexes=1:1:length(obj.layout_x);
+            not_affecting_turbines=obj.windfield.calculate_affturbines();
+            n_turbs=length(indexes)-length(not_affecting_turbines);
+            if n_turbs == 0
+               opt_yaw_angles=zeros(1,length(indexes));
+               return
+            end
+            for i=1:length(not_affecting_turbines)
+                pos=indexes==not_affecting_turbines(i);
+                indexes(pos)=[];
+            end
+
+            % PSO 
+            fun_obj = @(x) obj.cost_function(x, indexes);
+            lb=repelem(minimum_yaw_angle,n_turbs);
+            ub=repelem(maximum_yaw_angle,n_turbs); 
+            opts_pso = optimoptions('particleswarm', ...
+                'SwarmSize', 25, ...                % 粒子数量（推荐 20~50）
+                'MaxIterations', 150, ...          % 最大迭代次数
+                'Display', 'iter', ...              % 显示每次迭代结果
+                'PlotFcn', @pswplotbestf, ...       % 迭代过程中显示目标函数最优值
+                'HybridFcn', @fmincon);             % 可选混合局部优化器
+            yaw_optimization_partical = particleswarm(fun_obj, n_turbs, lb, ub, opts_pso);
+            % GB Optim
+            A=[]; b=[]; Aeq = []; beq = []; 
+            nonlcon = @(x) obj.nonlincon(x, qingzhou12_power, qingzhou3_power);
+            x_pso_based_init = yaw_optimization_partical;
+            opts_gb = optimoptions('fmincon', ...
+                'Algorithm', 'interior-point', ...
+                'StepTolerance', 1e-3, ...              % 增大容忍度避免过早收敛
+                'ConstraintTolerance', 1e-5, 'OptimalityTolerance', 1e-5, ...
+                'Display', 'iter', 'ScaleProblem', true, ...
+                'MaxIterations', 32, 'HonorBounds', true);
+            yaw_optimization_partical = fmincon(fun_obj, ...
+                                x_pso_based_init, A, b, Aeq, beq, lb, ub, nonlcon, opts_gb);
+            
+            opt_yaw_angles = zeros(length(obj.layout_x),1);
+            for i=1:length(indexes)
+                opt_yaw_angles(indexes(i))=yaw_optimization_partical(i);
+            end
+            obj.set_yaw_angles(opt_yaw_angles);
+            obj.calculate_wake();
+        end
 
 
         %aif_optimization_ga is a function that uses the genetic algorithm
@@ -1015,11 +1049,12 @@ classdef SmartWindInterface_yaw <handle
             power=-obj.get_farm_objective();
         end
 
+        % nonlinear constriant forcing P_opt > P_unopt
         function [c,ceq]=nonlincon(obj,yaw_angles,qingzhou12_power_limit,qingzhou3_power_limit)
             obj.set_yaw_angles(yaw_angles);
             obj.calculate_wake();
-            c=[qingzhou12_power_limit-obj.get_farm_qingzhou12_power();qingzhou3_power_limit-obj.get_farm_qingzhou3_power()];
-            ceq=0;
+            c=[qingzhou12_power_limit-obj.get_farm_qingzhou12_power(); qingzhou3_power_limit-obj.get_farm_qingzhou3_power()];
+            ceq=[];
         end
 
         function power=fast_cost_function(obj,yaw_angles,low,upp)
@@ -1029,5 +1064,21 @@ classdef SmartWindInterface_yaw <handle
             obj.calculate_wake();
             power=-obj.get_farm_power();
         end    
+
+        function rel_power = rel_cost_function(obj, yaw_angles, qingzhou12_agc, qingzhou3_agc)
+            obj.set_yaw_angles(yaw_angles);
+            obj.calculate_wake();
+            rel_power_12 = abs(obj.get_farm_qingzhou12_power() - qingzhou12_agc);
+            rel_power_3 = abs(obj.get_farm_qingzhou3_power() - qingzhou3_agc);
+            rel_power = rel_power_12 + rel_power_3;
+        end
+
+        function life_coefficient = life_cost_function(obj, yaw_angles)
+            obj.set_yaw_angles(yaw_angles);
+            obj.calculate_wake();
+            life_coefficient = obj.get_farm_life_coeff();
+            % life_coefficient = -life_coefficient; % 如果需要最小化寿命系数
+        end
+
     end
 end

@@ -115,10 +115,20 @@ swi_2.windfield.wake.turbulence_model='Huadian';
 swi_2.windfield.enable_wfr='N0';
 swi_2.windfield.resolution=[20 10 10];
 
+%% 确定最大可发功率
+tic
+swi_2.yaw_optimization_gb(without_optimization_p12, without_optimization_p3);
+toc
+
+p12_max = swi_2.get_farm_qingzhou12_power();
+p3_max = swi_2.get_farm_qingzhou3_power();
+opt_yaw_angles = swi_2.get_yaw_angles();
+
+
 tic
 
-swi_2.yaw_optimization_gb(without_optimization_p12,without_optimization_p3,y2);
-
+p12_agc = 3.9e8; p3_agc = 7.94e8;
+swi_2.yaw_optimization_pso_tracking_life_opt(p12_agc, p3_agc);
 
 toc
 optimized_wind_farm_generation=swi_2.get_farm_objective();
