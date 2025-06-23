@@ -794,7 +794,7 @@ classdef SmartWindInterface_yaw <handle
             %     pos=indexes==not_affecting_turbines(i);
             %     indexes(pos)=[];
             % end
-
+            n_turbs = 159; % Assuming all turbines are considered for optimization
             % PSO 
             fun_obj = @(x) obj.cost_function(x, indexes);
             lb=repelem(minimum_yaw_angle,n_turbs);
