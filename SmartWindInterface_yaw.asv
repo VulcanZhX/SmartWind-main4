@@ -184,7 +184,7 @@ classdef SmartWindInterface_yaw <handle
         end
         
 
-        %GET_YAW_ANGLES is a useful function that outputs a vector with the
+        %YAW_ANGLES is a useful function that outputs a vector with the
         %yaw angles of all the turbines, with the same order the turbines
         %are listed in the layout properties. This is a shortcut, since the
         %yaw angles are stored in different turbine objects and recalling
@@ -777,7 +777,55 @@ classdef SmartWindInterface_yaw <handle
 
         %%%%%%%%%%YAW_OPTIMIZATION_PSO_GB%%%%%%%%%%%%%%%%
         function opt_yaw_angles = yaw_optimization_pso_gb(obj, qingzhou12_power, qingzhou3_power)
+            minimum_yaw_angle=obj.yaw_lower;
+            maximum_yaw_angle=obj.yaw_upper;
 
+            indexes=1:1:length(obj.layout_x);
+            % Note: Does the custom 'Huadian' wake model leads to
+            % calculation failure? (all turbines are not affected... Fxxk)
+            % Temporary fix: disable calculating non-affected turbines.
+            % not_affecting_turbines=obj.windfield.calculate_affturbines();
+            % n_turbs=length(indexes)-length(not_affecting_turbines);
+            % if n_turbs == 0
+            %    opt_yaw_angles=zeros(1,length(indexes));
+            %    return
+            % end
+            % for i=1:length(not_affecting_turbines)
+            %     pos=indexes==not_affecting_turbines(i);
+            %     indexes(pos)=[];
+            % end
+            n_turbs = 159; % Assuming all turbines are considered for optimization
+            % PSO 
+            fun_obj = @(x) obj.cost_function(x);
+            lb=repelem(minimum_yaw_angle,n_turbs);
+            ub=repelem(maximum_yaw_angle,n_turbs); 
+            opts_pso = optimoptions('particleswarm', ...
+                'SwarmSize', 25, ...                % 粒子数量（推荐 20~50）
+                'MaxIterations', 150, ...          % 最大迭代次数
+                'Display', 'iter', ...              % 显示每次迭代结果
+                'PlotFcn', @pswplotbestf, ...       % 迭代过程中显示目标函数最优值
+                'HybridFcn', @fmincon);             % 可选混合局部优化器
+            yaw_optimization_partical = particleswarm(fun_obj, n_turbs, lb, ub, opts_pso);
+            % GB Optim
+            A=[]; b=[]; Aeq = []; beq = []; 
+            nonlcon = @(x) obj.nonlincon(x, qingzhou12_power, qingzhou3_power);
+            x_pso_based_init = yaw_optimization_partical;
+            opts_gb = optimoptions('fmincon', ...
+                'Algorithm', 'interior-point', ...
+                'StepTolerance', 1e-3, ...              % 增大容忍度避免过早收敛
+                'ConstraintTolerance', 1e-5, 'OptimalityTolerance', 1e-5, ...
+                'Display', 'iter', 'ScaleProblem', true, ...
+                'MaxIterations', 32, 'HonorBounds', true);
+            yaw_optimization_partical = fmincon(fun_obj, ...
+                                x_pso_based_init, A, b, Aeq, beq, lb, ub, nonlcon, opts_gb);
+            
+            opt_yaw_angles = zeros(length(obj.layout_x),1);
+            for i=1:length(indexes)
+                opt_yaw_angles(indexes(i))=yaw_optimization_partical(i);
+            end
+            obj.set_yaw_angles(opt_yaw_angles);
+            obj.calculate_wake();
+        end
 
 
         %aif_optimization_ga is a function that uses the genetic algorithm

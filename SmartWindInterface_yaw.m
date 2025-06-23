@@ -49,10 +49,6 @@ classdef SmartWindInterface_yaw <handle
         %%%%%%%%%%%%%%%%%%%%%%%%%SIMULATION_PART%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         
-
-
-
-
         %SET_LAYOUT is a function to set a layout different from the one 
         %initialized in the excel file. The input must be a matrix nx2 with
         %n the number of turbines; for each turbine coordinate x and y must
@@ -88,7 +84,7 @@ classdef SmartWindInterface_yaw <handle
         %of other classes. This function has the priority with respect to
         %other commands except for the function "set_layout".
 
-        % 排除故障涡轮机(优先设置)
+        %% 排除故障涡轮机(优先设置)
         function obj=exclude_turbines(obj,exc)
             obj.reset_farm_keep_layout();
             obj.turbine_status=ones(length(obj.layout_x),1);
@@ -184,7 +180,7 @@ classdef SmartWindInterface_yaw <handle
         end
         
 
-        %GET_YAW_ANGLES is a useful function that outputs a vector with the
+        %YAW_ANGLES is a useful function that outputs a vector with the
         %yaw angles of all the turbines, with the same order the turbines
         %are listed in the layout properties. This is a shortcut, since the
         %yaw angles are stored in different turbine objects and recalling
@@ -315,8 +311,7 @@ classdef SmartWindInterface_yaw <handle
         %% 存储青州1-2风场的功率
         function total_power_qingzhou12=get_farm_qingzhou12_power(obj)
             power_cell=zeros(obj.sqz_12,1);
-            for i=1:obj.sqz_12
-               
+            for i=1:obj.sqz_12   
                 power_cell(i)=obj.windfield.turbinechart.turbines...
                     {i,1}.power;
             end
@@ -324,26 +319,18 @@ classdef SmartWindInterface_yaw <handle
         end
 
 
-
-
-
-
-
         %% 存储青州3风场的功率
         function total_power_qingzhou3=get_farm_qingzhou3_power(obj)
-            power_cell=zeros(obj.sqz_12,1);
-            for i=obj.sqz_12+1:obj.sqz_123
-               
+            power_cell=zeros(obj.sqz_123-obj.sqz_12,1);
+            for i=1:(obj.sqz_123-obj.sqz_12) %从青州12风场的最后一个风机开始  
                 power_cell(i)=obj.windfield.turbinechart.turbines...
-                    {i,1}.power;
+                    {i+obj.sqz_12,1}.power;
             end
             total_power_qingzhou3=sum(power_cell);
         end
 
-
-
-         %% 存储各风机的寿命
-        function life_cell=get_turbines_life(obj)
+        %% 存储各风机的寿命系数
+        function life_cell=get_turbines_life_coeff(obj)
             life_cell=zeros(length(obj.layout_x),1);
             for i=1:length(obj.layout_x)
                 life_cell(i)=obj.windfield.turbinechart.turbines...
@@ -367,7 +354,7 @@ classdef SmartWindInterface_yaw <handle
         end
 
 
-        %% 存储各风机的寿命+功率
+        %% 存储各风机的功率+寿命
         function objective_cell=get_turbines_objective(obj)
             objective_cell=zeros(length(obj.layout_x),1);
             for i=1:length(obj.layout_x)
@@ -406,13 +393,6 @@ classdef SmartWindInterface_yaw <handle
             % total_life_objective=mean(objective_life_cell)-sqrt(mean((objective_life_cell-mean(objective_life_cell)).^2));
             total_generation=sum(objective_cell);
         end
-
-
-
-
-
-
-
         
         %GET_TURBINES_VELOCITY is a function that outputs a vector
         %containing as element the velocities at each turbine. Since in
@@ -796,7 +776,7 @@ classdef SmartWindInterface_yaw <handle
             % end
             n_turbs = 159; % Assuming all turbines are considered for optimization
             % PSO 
-            fun_obj = @(x) obj.cost_function(x, indexes);
+            fun_obj = @(x) obj.cost_function(x);
             lb=repelem(minimum_yaw_angle,n_turbs);
             ub=repelem(maximum_yaw_angle,n_turbs); 
             opts_pso = optimoptions('particleswarm', ...
@@ -1071,16 +1051,15 @@ classdef SmartWindInterface_yaw <handle
         function rel_power = rel_cost_function(obj, yaw_angles, qingzhou12_agc, qingzhou3_agc)
             obj.set_yaw_angles(yaw_angles);
             obj.calculate_wake();
-            rel_power_12 = abs(obj.get_farm_qingzhou12_power() - qingzhou12_agc);
-            rel_power_3 = abs(obj.get_farm_qingzhou3_power() - qingzhou3_agc);
+            rel_power_12 = norm(obj.get_farm_qingzhou12_power() - qingzhou12_agc);
+            rel_power_3 = norm(obj.get_farm_qingzhou3_power() - qingzhou3_agc);
             rel_power = rel_power_12 + rel_power_3;
         end
 
         function life_coefficient = life_cost_function(obj, yaw_angles)
             obj.set_yaw_angles(yaw_angles);
             obj.calculate_wake();
-            life_coefficient = obj.get_farm_life_coeff();
-            % life_coefficient = -life_coefficient; % 如果需要最小化寿命系数
+            life_coefficient = obj.get_farm_life_coeff(); % minimize life coefficient sum
         end
 
     end
