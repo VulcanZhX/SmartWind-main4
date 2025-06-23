@@ -776,15 +776,17 @@ classdef SmartWindInterface_yaw <handle
             % end
             n_turbs = 159; % Assuming all turbines are considered for optimization
             % PSO 
+        
             fun_obj = @(x) obj.cost_function(x);
+            init_pos = zeros(1, 40);
             lb=repelem(minimum_yaw_angle,n_turbs);
             ub=repelem(maximum_yaw_angle,n_turbs); 
             opts_pso = optimoptions('particleswarm', ...
-                'SwarmSize', 25, ...                % 粒子数量（推荐 20~50）
-                'MaxIterations', 150, ...          % 最大迭代次数
+                'SwarmSize', 40, ...                % 粒子数量（推荐 20~50）
+                'MaxIterations', 250, ...          % 最大迭代次数
                 'Display', 'iter', ...              % 显示每次迭代结果
-                'PlotFcn', @pswplotbestf, ...       % 迭代过程中显示目标函数最优值
-                'HybridFcn', @fmincon);             % 可选混合局部优化器
+                'PlotFcn', @pswplotbestf, 'InitialPoints', init_pos);       % 迭代过程中显示目标函数最优值
+                % 'HybridFcn', @fmincon);             % 可选混合局部优化器
             yaw_optimization_partical = particleswarm(fun_obj, n_turbs, lb, ub, opts_pso);
             % GB Optim
             A=[]; b=[]; Aeq = []; beq = []; 
@@ -1029,7 +1031,7 @@ classdef SmartWindInterface_yaw <handle
             % end
             obj.set_yaw_angles(yaw_angles);
             obj.calculate_wake();
-            power=-obj.get_farm_objective();
+            power=-obj.get_farm_power();
         end
 
         % nonlinear constriant forcing P_opt > P_unopt

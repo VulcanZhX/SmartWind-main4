@@ -92,37 +92,37 @@ swi_1.windfield.enable_wfr='N0';
 swi_1.windfield.resolution=[20 10 10];
 
 swi_1.calculate_wake();
-without_optimization_farm_generation=swi_1.get_farm_generation();
+without_optimization_farm_power=swi_1.get_farm_power();
 without_optimization_farm_yaw=swi_1.get_yaw_angles();
 
 without_optimization_p12=swi_1.get_farm_qingzhou12_power();
 without_optimization_p3=swi_1.get_farm_qingzhou3_power();
-fatigue_1=swi_1.get_farm_life_coeff();
+fatigue_1=swi_1.get_turbines_life_coeff();
 figure(1)
 
 
-% swi_1.show_horplane(110.85);
+swi_1.show_horplane(110.85);
 % without_optimization_result(i,j).obj=swi;
 
 
 % %% 场群优化
-% swi_2=SmartWindInterface_yaw(sqz_12,turbine_diameter_vector,turbine_hub_height_vector,rated_power_vector,life_total_vector,repair_c_vector,matrix,fatigue_1,0,8);
-% rng("default")
-% % swi.windfield.wind_direction=270;
-% swi_2.windfield.wake.velocity_model='Huadian';
-% swi_2.windfield.wake.deflection_model='Huadian';
-% swi_2.windfield.wake.turbulence_model='Huadian';
-% swi_2.windfield.enable_wfr='N0';
-% swi_2.windfield.resolution=[20 10 10];
+swi_2=SmartWindInterface_yaw(sqz_12,turbine_diameter_vector,turbine_hub_height_vector,rated_power_vector,life_total_vector,repair_c_vector,matrix,fatigue_1,0,8);
+rng("default")
+% swi.windfield.wind_direction=270;
+swi_2.windfield.wake.velocity_model='Huadian';
+swi_2.windfield.wake.deflection_model='Huadian';
+swi_2.windfield.wake.turbulence_model='Huadian';
+swi_2.windfield.enable_wfr='N0';
+swi_2.windfield.resolution=[20 10 10];
 
 % %% 确定最大可发功率
-% tic
-% swi_2.yaw_optimization_pso_gb(without_optimization_p12, without_optimization_p3);
-% toc
+tic
+swi_2.yaw_optimization_pso_gb(without_optimization_p12, without_optimization_p3);
+toc
 
-% p12_max = swi_2.get_farm_qingzhou12_power();
-% p3_max = swi_2.get_farm_qingzhou3_power();
-% opt_yaw_angles = swi_2.get_yaw_angles();
+p12_max = swi_2.get_farm_qingzhou12_power();
+p3_max = swi_2.get_farm_qingzhou3_power();
+opt_yaw_angles = swi_2.get_yaw_angles();
 
 
 % tic
