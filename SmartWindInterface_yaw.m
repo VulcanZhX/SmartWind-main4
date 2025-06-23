@@ -784,16 +784,16 @@ classdef SmartWindInterface_yaw <handle
             % Note: Does the custom 'Huadian' wake model leads to
             % calculation failure? (all turbines are not affected... Fxxk)
             % Temporary fix: disable calculating non-affected turbines.
-            not_affecting_turbines=obj.windfield.calculate_affturbines();
-            n_turbs=length(indexes)-length(not_affecting_turbines);
-            if n_turbs == 0
-               opt_yaw_angles=zeros(1,length(indexes));
-               return
-            end
-            for i=1:length(not_affecting_turbines)
-                pos=indexes==not_affecting_turbines(i);
-                indexes(pos)=[];
-            end
+            % not_affecting_turbines=obj.windfield.calculate_affturbines();
+            % n_turbs=length(indexes)-length(not_affecting_turbines);
+            % if n_turbs == 0
+            %    opt_yaw_angles=zeros(1,length(indexes));
+            %    return
+            % end
+            % for i=1:length(not_affecting_turbines)
+            %     pos=indexes==not_affecting_turbines(i);
+            %     indexes(pos)=[];
+            % end
 
             % PSO 
             fun_obj = @(x) obj.cost_function(x, indexes);
