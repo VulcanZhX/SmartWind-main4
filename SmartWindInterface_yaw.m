@@ -736,7 +736,9 @@ classdef SmartWindInterface_yaw <handle
                 'Display', 'iter', ... %显示迭代信息
                 'FunctionTolerance', 1e-6);
             yaw_optim_pso_res = particleswarm(fun_tracking, nvars, lb, ub, opt_pso); %粒子群优化
-            
+            if yaw_optim_pso_res < ub && yaw_optim_pso_res > lb
+                disp("chk pass")
+            end
             % 优化寿命
             x0 = yaw_optim_pso_res; %初始粒子位置为优化后的偏航角
             fun_life = @(x)obj.life_cost_function(x); %寿命成本函数
@@ -744,11 +746,11 @@ classdef SmartWindInterface_yaw <handle
             Aeq = []; beq = []; 
             nonlcon = @(x)obj.nonlincon(x,qingzhou12_power_limit,qingzhou3_power_limit); %非线性约束
             opts_gb = optimoptions('fmincon', ...
-                'Algorithm', 'interior-point', ...
+                'Algorithm', 'sqp', ...
                 'StepTolerance', 1e-3, ...              % 增大容忍度避免过早收敛
                 'ConstraintTolerance', 1e-5, 'OptimalityTolerance', 1e-5, ...
                 'Display', 'iter', 'ScaleProblem', true, ...
-                'MaxIterations', 32, 'HonorBounds', true);
+                'MaxIterations', 40, 'HonorBounds', true, 'UseParallel',true);
             opt_yaw_angles = fmincon(fun_life, x0, A, b, Aeq, beq, lb, ub, nonlcon, opts_gb); %最小化寿命成本函数
             obj.set_yaw_angles(opt_yaw_angles);
             obj.calculate_wake();
@@ -778,28 +780,33 @@ classdef SmartWindInterface_yaw <handle
             % PSO 
         
             fun_obj = @(x) obj.cost_function(x);
-            init_pos = zeros(1, 40);
+            init_pos = zeros(1, 159);
             lb=repelem(minimum_yaw_angle,n_turbs);
             ub=repelem(maximum_yaw_angle,n_turbs); 
             opts_pso = optimoptions('particleswarm', ...
-                'SwarmSize', 40, ...                % 粒子数量（推荐 20~50）
+                'SwarmSize', 25, ...                % 粒子数量（推荐 20~50）
                 'MaxIterations', 250, ...          % 最大迭代次数
                 'Display', 'iter', ...              % 显示每次迭代结果
-                'PlotFcn', @pswplotbestf, 'InitialPoints', init_pos);       % 迭代过程中显示目标函数最优值
+                'PlotFcn', @pswplotbestf,...
+                'UseParallel', true);       % 迭代过程中显示目标函数最优值
                 % 'HybridFcn', @fmincon);             % 可选混合局部优化器
-            yaw_optimization_partical = particleswarm(fun_obj, n_turbs, lb, ub, opts_pso);
+            [yaw_optimization_partical, fval] = particleswarm(fun_obj, n_turbs, lb, ub, opts_pso);
+            % if yaw_optimization_partical < ub && yaw_optimization_partical > lb
+            %     disp("chk pass")
+            % end
             % GB Optim
-            A=[]; b=[]; Aeq = []; beq = []; 
-            nonlcon = @(x) obj.nonlincon(x, qingzhou12_power, qingzhou3_power);
-            x_pso_based_init = yaw_optimization_partical;
-            opts_gb = optimoptions('fmincon', ...
-                'Algorithm', 'interior-point', ...
-                'StepTolerance', 1e-3, ...              % 增大容忍度避免过早收敛
-                'ConstraintTolerance', 1e-5, 'OptimalityTolerance', 1e-5, ...
-                'Display', 'iter', 'ScaleProblem', true, ...
-                'MaxIterations', 32, 'HonorBounds', true);
-            yaw_optimization_partical = fmincon(fun_obj, ...
-                                x_pso_based_init, A, b, Aeq, beq, lb, ub, nonlcon, opts_gb);
+            
+            % A=[]; b=[]; Aeq = []; beq = []; 
+            % nonlcon = @(x) obj.nonlincon(x, qingzhou12_power, qingzhou3_power);
+            % x_pso_based_init = yaw_optimization_partical;
+            % opts_gb = optimoptions('fmincon', ...
+            %     'Algorithm', 'interior-point', ...
+            %     'StepTolerance', 1e-3, ...              % 增大容忍度避免过早收敛
+            %     'ConstraintTolerance', 1e-5, 'OptimalityTolerance', 1e-5, ...
+            %     'Display', 'iter', 'ScaleProblem', true, ...
+            %     'MaxIterations', 32, 'HonorBounds', true, 'UseParallel', true);
+            % yaw_optimization_partical = fmincon(fun_obj, ...
+            %                     x_pso_based_init, A, b, Aeq, beq, lb, ub, nonlcon, opts_gb);
             
             opt_yaw_angles = zeros(length(obj.layout_x),1);
             for i=1:length(indexes)

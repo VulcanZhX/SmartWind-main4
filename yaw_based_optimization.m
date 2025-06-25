@@ -117,6 +117,7 @@ swi_2.windfield.resolution=[20 10 10];
 
 % %% 确定最大可发功率
 tic
+parpool;
 swi_2.yaw_optimization_pso_gb(without_optimization_p12, without_optimization_p3);
 toc
 
