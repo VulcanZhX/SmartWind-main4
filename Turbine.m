@@ -7,8 +7,8 @@ classdef Turbine < handle
         life_total
         repair_c
         
-        %%%% 整个风场的环境湍流强度
-        wind_field_turbulence_intensity=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Windfield','Range','B3:B3'));
+        % %%%% 整个风场的环境湍流强度
+        % wind_field_turbulence_intensity=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Windfield','Range','B3:B3'));
 
         %%%优化相关量
         optimization_period=30                                                                                  %30s优化一次
@@ -19,14 +19,10 @@ classdef Turbine < handle
         dis_coefficient=0.7
         %%%%%优化相关量
 
-
         delta_t=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Turbine','Range','B14:B14'))                %优化周期                                                                                           %优化周期
         blade_count=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Turbine','Range','B5:B5'))
-
-        
         pP=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Turbine','Range','B6:B6'))                       %青州123
         pT=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Turbine','Range','B7:B7'))                       %青州123
-
         generator_efficiency=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Turbine','Range','B8:B8'))
         power_thrust_table_11
         power_thrust_table_68
@@ -37,7 +33,7 @@ classdef Turbine < handle
 
         tilt_angle=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Turbine','Range','B11:B11'))             %倾斜角度
 
-        tsr=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Turbine','Range','B9:B9'))                      %叶尖速比(青州123)
+        % tsr=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','Turbine','Range','B9:B9'))                      %叶尖速比(青州123)
 
         consumed_comprehensive_fatigue_coefficient=0                                                       %已运行的寿命损耗，假设各风机相同
 

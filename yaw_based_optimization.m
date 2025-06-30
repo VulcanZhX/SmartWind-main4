@@ -99,11 +99,10 @@ without_optimization_p12=swi_1.get_farm_qingzhou12_power();
 without_optimization_p3=swi_1.get_farm_qingzhou3_power();
 fatigue_1=swi_1.get_turbines_life_coeff();
 figure(1)
-
+% life_cost_function(swi_1, 6*rand(1, 159))
 
 swi_1.show_horplane(110.85);
 % without_optimization_result(i,j).obj=swi;
-
 
 % %% 场群优化
 swi_2=SmartWindInterface_yaw(sqz_12,turbine_diameter_vector,turbine_hub_height_vector,rated_power_vector,life_total_vector,repair_c_vector,matrix,fatigue_1,0,8);
@@ -115,26 +114,35 @@ swi_2.windfield.wake.turbulence_model='Huadian';
 swi_2.windfield.enable_wfr='N0';
 swi_2.windfield.resolution=[20 10 10];
 
+
+
 % %% 确定最大可发功率
 tic
 swi_2.yaw_optimization_pso_gb(without_optimization_p12, without_optimization_p3);
 toc
 
+opt1_farm_power = swi_2.get_farm_power();
 p12_max = swi_2.get_farm_qingzhou12_power();
 p3_max = swi_2.get_farm_qingzhou3_power();
 opt_yaw_angles = swi_2.get_yaw_angles();
 
+%%% 功率跟踪测试
+tic
+swi_2.yaw_optimization_pso_gb_tracking(p12_max-2.1e6, p3_max-4e5);
+toc
 
-% tic
+tic
 
-% p12_agc = 3.9e8; p3_agc = 7.94e8;
-% swi_2.yaw_optimization_pso_tracking_life_opt(p12_agc, p3_agc);
+p12_agc = p12_max - 3e6; p3_agc = p3_max - 6e5;
+swi_2.yaw_optimization_pso_tracking_life_opt(p12_agc, p3_agc);
 
-% toc
-% optimized_wind_farm_generation=swi_2.get_farm_objective();
-% optimized_wind_farm_yaw=swi_2.get_yaw_angles();
-% swi_2.calculate_wake();
-% figure(2)
+toc
+p12_track = swi_2.get_farm_qingzhou12_power();
+p3_track = swi_2.get_farm_qingzhou3_power();
+optimized_wind_farm_generation=swi_2.get_farm_objective();
+optimized_wind_farm_yaw=swi_2.get_yaw_angles();
+swi_2.calculate_wake();
+figure(2)
 
 
 % swi_2.show_horplane(110.85);
