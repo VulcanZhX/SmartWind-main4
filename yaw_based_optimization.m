@@ -89,7 +89,7 @@ swi_1.windfield.wake.velocity_model='Huadian';
 swi_1.windfield.wake.deflection_model='Huadian';
 swi_1.windfield.wake.turbulence_model='Huadian';
 swi_1.windfield.enable_wfr='N0';
-swi_1.windfield.resolution=[20 10 10];
+swi_1.windfield.resolution=[20 10 5];
 
 swi_1.calculate_wake();
 without_optimization_farm_power=swi_1.get_farm_power();
@@ -118,7 +118,6 @@ swi_2.windfield.resolution=[20 10 10];
 
 % %% 确定最大可发功率
 tic
-parpool;
 swi_2.yaw_optimization_pso_gb(without_optimization_p12, without_optimization_p3);
 toc
 
@@ -126,6 +125,7 @@ opt1_farm_power = swi_2.get_farm_power();
 p12_max = swi_2.get_farm_qingzhou12_power();
 p3_max = swi_2.get_farm_qingzhou3_power();
 opt_yaw_angles = swi_2.get_yaw_angles();
+save('yaw_max_power.mat')
 
 %%% 功率跟踪测试
 tic
@@ -133,7 +133,6 @@ swi_2.yaw_optimization_pso_gb_tracking(p12_max-2.1e6, p3_max-4e5);
 toc
 
 tic
-
 p12_agc = p12_max - 3e6; p3_agc = p3_max - 6e5;
 swi_2.yaw_optimization_pso_tracking_life_opt(p12_agc, p3_agc);
 
