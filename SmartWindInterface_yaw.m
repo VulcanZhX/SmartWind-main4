@@ -847,7 +847,6 @@ classdef SmartWindInterface_yaw <handle
             % end
             n_turbs = 159; % Assuming all turbines are considered for optimization
             % PSO 
-        
             fun_obj = @(x) obj.cost_function(x);
             init_pos = zeros(1, 159);
             lb=repelem(minimum_yaw_angle,n_turbs);
@@ -859,13 +858,9 @@ classdef SmartWindInterface_yaw <handle
                 'PlotFcn', @pswplotbestf, 'InitialPoints', init_pos);       % 迭代过程中显示目标函数最优值
                 % 'HybridFcn', @fmincon);             % 可选混合局部优化器
             [yaw_optimization_partical, ~] = particleswarm(fun_obj, n_turbs, lb, ub, opts_pso);
-            % if yaw_optimization_partical < ub && yaw_optimization_partical > lb
-            %     disp("chk pass")
-            % end
-            % GB Optim
             
             A=[]; b=[]; Aeq = []; beq = []; 
-            nonlcon = @(x) obj.nonlincon(x, qingzhou12_power, qingzhou3_power);
+            nonlcon = @(x) obj.nonlincon(x, 0.9*qingzhou12_power, qingzhou3_power);
             x_pso_based_init = yaw_optimization_partical;
             opts_gb = optimoptions('fmincon', ...
                 'Algorithm', 'interior-point', ...,

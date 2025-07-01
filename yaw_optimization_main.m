@@ -1,11 +1,7 @@
 clc
-clear all
+clear
 close all
-
-
-
 load y2_0_8_initial.mat
-
 
 
 %% 场群风资源输入设置
@@ -47,12 +43,8 @@ windfarmcluster_wind_speed_W_NW=3:1:5;
 windfarmcluster_wind_direction_NW_N=325:5:360;
 windfarmcluster_wind_speed_NW_N=3:1:5;
 
-
-
-
 %% 初始化偏航设置
 matrix=zeros(1,159);
-
 
 %% 不同类型机组的设置
 sqz_1=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','WindField','Range','B10:B10'));              %青州1风机个数
@@ -98,10 +90,9 @@ without_optimization_farm_yaw=swi_1.get_yaw_angles();
 without_optimization_p12=swi_1.get_farm_qingzhou12_power();
 without_optimization_p3=swi_1.get_farm_qingzhou3_power();
 fatigue_1=swi_1.get_turbines_life_coeff();
-figure(1)
+% figure(1)
 % life_cost_function(swi_1, 6*rand(1, 159))
-
-swi_1.show_horplane(110.85);
+% swi_1.show_horplane(110.85);
 % without_optimization_result(i,j).obj=swi;
 
 % %% 场群优化
@@ -114,35 +105,62 @@ swi_2.windfield.wake.turbulence_model='Huadian';
 swi_2.windfield.enable_wfr='N0';
 swi_2.windfield.resolution=[20 10 10];
 
-
-
-% %% 确定最大可发功率
+%% parfor loop to optimize yaw angles under different wind speed (wind direction is fixed at 0 degrees)
 tic
-swi_2.yaw_optimization_pso_gb(without_optimization_p12, without_optimization_p3);
+windspeed_parallel = 6:9; % 6, 7, 8, 9 m/s
+swi_cellarr = cell(length(windspeed_parallel), 1);
+yaw_cellarr = cell(length(windspeed_parallel), 1);
+power_max_cellarr = cell(length(windspeed_parallel), 1);
+p12_max_cellarr = cell(length(windspeed_parallel), 1);
+p3_max_cellarr = cell(length(windspeed_parallel), 1);
+% initialize parallel pool with the number of wind speeds
+parpool('local', length(windspeed_parallel))
+parfor ind_vel = 1:length(windspeed_parallel)
+    swi_cellarr{ind_vel} = SmartWindInterface_yaw(sqz_12, turbine_diameter_vector, turbine_hub_height_vector, ...
+                rated_power_vector, life_total_vector, repair_c_vector, matrix, fatigue_1, 0, windspeed_parallel(ind_vel));
+    swi_cellarr{ind_vel}.windfield.wake.velocity_model = 'Huadian';
+    swi_cellarr{ind_vel}.windfield.wake.deflection_model = 'Huadian';
+    swi_cellarr{ind_vel}.windfield.wake.turbulence_model = 'Huadian';
+    swi_cellarr{ind_vel}.windfield.enable_wfr = 'N0';
+    swi_cellarr{ind_vel}.windfield.resolution = [20 10 5];
+    % parallel optimization for each wind speed
+    swi_cellarr{ind_vel}.yaw_optimization_pso_gb(without_optimization_p12, without_optimization_p3);
+
+    % save results
+    yaw_cellarr{ind_vel} = swi_cellarr{ind_vel}.get_yaw_angles();
+    power_max_cellarr{ind_vel} = swi_cellarr{ind_vel}.get_farm_power();
+    p12_max_cellarr{ind_vel} = swi_cellarr{ind_vel}.get_farm_qingzhou12_power();
+    p3_max_cellarr{ind_vel} = swi_cellarr{ind_vel}.get_farm_qingzhou3_power();
+end
 toc
 
-opt1_farm_power = swi_2.get_farm_power();
-p12_max = swi_2.get_farm_qingzhou12_power();
-p3_max = swi_2.get_farm_qingzhou3_power();
-opt_yaw_angles = swi_2.get_yaw_angles();
-save('yaw_max_power.mat')
+%% Shutdown parallel pool and save results
+delete(gcp('nocreate')) % shutdown parallel pool
+save('yawopt_main_maxpower_vars.mat', "swi_cellarr", "yaw_cellarr", "power_max_cellarr", ...
+    "p12_max_cellarr", "p3_max_cellarr", "without_optimization_farm_power", ...
+    "without_optimization_farm_yaw", "without_optimization_p12", "without_optimization_p3");
+% opt1_farm_power = swi_2.get_farm_power();
+% p12_max = swi_2.get_farm_qingzhou12_power();
+% p3_max = swi_2.get_farm_qingzhou3_power();
+% opt_yaw_angles = swi_2.get_yaw_angles();
+% save('yaw_max_power.mat')
 
-%%% 功率跟踪测试
-tic
-swi_2.yaw_optimization_pso_gb_tracking(p12_max-2.1e6, p3_max-4e5);
-toc
+% %%% 功率跟踪测试
+% tic
+% swi_2.yaw_optimization_pso_gb_tracking(p12_max-2.1e6, p3_max-4e5);
+% toc
 
-tic
-p12_agc = p12_max - 3e6; p3_agc = p3_max - 6e5;
-swi_2.yaw_optimization_pso_tracking_life_opt(p12_agc, p3_agc);
+% tic
+% p12_agc = p12_max - 3e6; p3_agc = p3_max - 6e5;
+% swi_2.yaw_optimization_pso_tracking_life_opt(p12_agc, p3_agc);
 
-toc
-p12_track = swi_2.get_farm_qingzhou12_power();
-p3_track = swi_2.get_farm_qingzhou3_power();
-optimized_wind_farm_generation=swi_2.get_farm_objective();
-optimized_wind_farm_yaw=swi_2.get_yaw_angles();
-swi_2.calculate_wake();
-figure(2)
+% toc
+% p12_track = swi_2.get_farm_qingzhou12_power();
+% p3_track = swi_2.get_farm_qingzhou3_power();
+% optimized_wind_farm_generation=swi_2.get_farm_objective();
+% optimized_wind_farm_yaw=swi_2.get_yaw_angles();
+% swi_2.calculate_wake();
+% figure(2)
 
 
 % swi_2.show_horplane(110.85);
