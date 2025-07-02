@@ -696,6 +696,8 @@ classdef SmartWindInterface_yaw <handle
                 opt_yaw_angles(indexes(i))=opt_yaw_angles_partial(i);
             end
             obj.set_yaw_angles(opt_yaw_angles);
+            %opt_yaw_angles=round(opt_yaw_angles);
+            %obj.set_yaw_angles(opt_yaw_angles);
             obj.calculate_wake();
         end
 
@@ -746,6 +748,8 @@ classdef SmartWindInterface_yaw <handle
                 opt_yaw_angles(indexes(i))=opt_yaw_angles_partial(i);
             end
             obj.set_yaw_angles(opt_yaw_angles);
+            %opt_yaw_angles=round(opt_yaw_angles);
+            %obj.set_yaw_angles(opt_yaw_angles);
             obj.calculate_wake();
         end
 
@@ -858,7 +862,6 @@ classdef SmartWindInterface_yaw <handle
 
         %%%%%%%%%%YAW_OPTIMIZATION_PSO_GB%%%%%%%%%%%%%%%%
         function opt_yaw_angles = yaw_optimization_pso_gb(obj, qingzhou12_power, qingzhou3_power)
-            rng('default'); % Set random seed for reproducibility
             minimum_yaw_angle=obj.yaw_lower;
             maximum_yaw_angle=obj.yaw_upper;
 
@@ -884,7 +887,7 @@ classdef SmartWindInterface_yaw <handle
             ub=repelem(maximum_yaw_angle,n_turbs); 
             opts_pso = optimoptions('particleswarm', ...
                 'SwarmSize', 30, ...                % 粒子数量（推荐 20~50）
-                'MaxIterations', 150, ...          % 最大迭代次数
+                'MaxIterations', 200, ...          % 最大迭代次数
                 'Display', 'iter', ...              % 显示每次迭代结果
                 'PlotFcn', @pswplotbestf, 'InitialPoints', init_pos,...
                 'MaxStallIterations', 30);       % 迭代过程中显示目标函数最优值
@@ -892,7 +895,7 @@ classdef SmartWindInterface_yaw <handle
             [yaw_optimization_partical, ~] = particleswarm(fun_obj, n_turbs, lb, ub, opts_pso);
             
             A=[]; b=[]; Aeq = []; beq = []; 
-            nonlcon = @(x) obj.nonlincon(x, 0.9*qingzhou12_power, 0.96*qingzhou3_power);
+            nonlcon = @(x) obj.nonlincon(x, 0.9*qingzhou12_power, qingzhou3_power);
             x_pso_based_init = yaw_optimization_partical;
             opts_gb = optimoptions('fmincon', ...
                 'Algorithm', 'interior-point', ...,
@@ -933,20 +936,7 @@ classdef SmartWindInterface_yaw <handle
                 'HybridFcn', 'fmincon', ...
                 'MaxStallIterations', 25);
             yaw_optim_pso_res = particleswarm(fun_tracking, nvars, lb, ub, opt_pso); %粒子群优化
-
-            A=[]; b=[]; Aeq = []; beq = []; 
-            nonlcon = @(x) -obj.nonlincon(x, qingzhou12_power, qingzhou3_power);
-            x_pso_based_init = yaw_optim_pso_res;
-            opts_gb = optimoptions('fmincon', ...
-                'Algorithm', 'interior-point', ...,
-                'StepTolerance', 2e-4, ...
-                'OptimalityTolerance', 5e-4, ...
-                'Display', 'iter', 'ScaleProblem', true, ...
-                'MaxIterations', 30, 'HonorBounds', true);
-            yaw_optim_pso_res_gb = fmincon(fun_tracking, ...
-                                x_pso_based_init, A, b, Aeq, beq, lb, ub, nonlcon, opts_gb);
-            opt_yaw_angles = yaw_optim_pso_res_gb;
-            obj.set_yaw_angles(opt_yaw_angles);
+            opt_yaw_angles = yaw_optim_pso_res;
             obj.calculate_wake();
         end
 

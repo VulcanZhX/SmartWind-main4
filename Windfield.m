@@ -2,7 +2,7 @@ classdef Windfield < handle
     
     properties
         wind_speed%=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','WindField','Range','B3:B3'));           %风速
-        wind_direction%=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','WindField','Range','B4:B4'));       %风向
+        wind_direction_real%=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','WindField','Range','B4:B4'));       %风向
         turbulence_intensity=cell2mat(readcell('inputs_all_fields.xlsx','Sheet','WindField','Range','B5:B5')); %湍流强度
         added_turbulence_intensity=1;%cell2mat(readcell('inputs_all_fields.xlsx','Sheet','WindField','Range','B13:B13')); %附加湍流强度
 
@@ -33,7 +33,7 @@ classdef Windfield < handle
         function obj=Windfield(turbinechart,winddirection,windvelocity,wake)
             obj.turbinechart=turbinechart;
             obj.wake=wake;
-            obj.wind_direction=winddirection;
+            obj.wind_direction_real=winddirection;
             obj.wind_speed=windvelocity;
         end
         
@@ -141,19 +141,21 @@ classdef Windfield < handle
 %         end
         %% 风向改变后各网格点的坐标
         function [rotated_x,rotated_y,rotated_z]=rotate_grid(obj,center) %基于风向对坐标进行旋转，风向改变前排机组变化
+            wind_direction=encase180(obj.wind_direction_real-270);
             x_offset=obj.x-center(1);
             y_offset=obj.y-center(2);
-            rotated_x=x_offset*cosd(obj.wind_direction)-y_offset*sind(obj.wind_direction)+center(1);
-            rotated_y=x_offset*sind(obj.wind_direction)+y_offset*cosd(obj.wind_direction)+center(2);
+            rotated_x=x_offset*cosd(wind_direction)-y_offset*sind(wind_direction)+center(1);
+            rotated_y=x_offset*sind(wind_direction)+y_offset*cosd(wind_direction)+center(2);
             rotated_z=obj.z;
         end
 
-        function set.wind_direction(obj,value)
-            obj.wind_direction=encase180(value-270);
-        end
+        % function set.wind_direction(obj,value)
+        %     obj.wind_direction=encase180(value-270);
+        % end
 
         %% 计算当前风机i在下游产生的尾流赤字
         function obj=calculatewake(obj)%风场对象
+            wind_direction=encase180(obj.wind_direction_real-270);
 
             %% 风向改变后，风机旋转坐标
             u_init=obj.u_initial;                                                 %场群所有网格点的初始风速
@@ -169,7 +171,7 @@ classdef Windfield < handle
             bd=obj.bounds;                                                        %风场边界信息
             center=[mean([bd(1),bd(2)])...
                    ,mean([bd(3),bd(4)]),0];                                       %风场中心位置坐标
-            rotated_chart=obj.turbinechart.rotated(center,obj.wind_direction);    %依据当前风向确定的旋转风机坐标图
+            rotated_chart=obj.turbinechart.rotated(center,wind_direction);    %依据当前风向确定的旋转风机坐标图
 
 
 
@@ -194,8 +196,6 @@ classdef Windfield < handle
             for i=1:length(obj.turbinechart.layout_x)
                 obj.turbinechart.turbines{sorted_indexes(i),1}.update_velocities(u_wake,obj,...
                 sorted_coords(i,:),rotated_x,rotated_y,rotated_z,u_init,sorted_indexes(i));
-
-                
 
                 %当前风机i在其他网格点处产生的尾流偏转
                 [deflection]=obj.wake.deflection_function(rotated_x,...
@@ -244,12 +244,13 @@ classdef Windfield < handle
 
         %% 不考虑尾流影响下的风场速度分布
         function obj=calculatenowake(obj)%不考虑尾流影响下的风机速度场
+            wind_direction=encase180(obj.wind_direction_real-270);
             u_init=obj.u_initial;
             obj.u=obj.u_initial;            
             bd=obj.bounds;
             center=[mean([bd(1),bd(2)])...
                    ,mean([bd(3),bd(4)]),0];
-            rotated_chart=obj.turbinechart.rotated(center,obj.wind_direction);
+            rotated_chart=obj.turbinechart.rotated(center,wind_direction);
             [rotated_x,rotated_y,rotated_z]=obj.rotate_grid(center);
             [rotated_coords,~,rotated_indexes]=extract_features_tc(rotated_chart);
             u_wake=zeros(size(obj.u));
@@ -262,6 +263,7 @@ classdef Windfield < handle
 
         %% 识别不受其他风机尾流影响的风机 
         function not_affecting_turbines=calculate_affturbines(obj)
+            wind_direction=encase180(obj.wind_direction_real-270);
             u_init=obj.u_initial;                                                                   %%所有网格点处的初始风速
             obj.u=u_init; 
 
@@ -275,7 +277,7 @@ classdef Windfield < handle
             bd=obj.bounds;                                                                          %%风场边界
             center=[mean([bd(1),bd(2)])...
                    ,mean([bd(3),bd(4)]),0];                                                         %%风场中心
-            rotated_chart=obj.turbinechart.rotated(center,obj.wind_direction);                      %% 依据当前风场风向和边界确定旋转后的风机坐标
+            rotated_chart=obj.turbinechart.rotated(center,wind_direction);                      %% 依据当前风场风向和边界确定旋转后的风机坐标
             [rotated_x,rotated_y,rotated_z]=obj.rotate_grid(center);                                %%各网格点依据当前中心和风向旋转后的坐标
             sorted_chart=obj.turbinechart.sortinx(rotated_chart);                                   %%按x坐标大小排序后的风机
             [sorted_coords,~,sorted_indexes]=extract_features_tc(sorted_chart);                     %%分别提取排序后的风机坐标和其对应的风机索引
@@ -320,10 +322,11 @@ classdef Windfield < handle
 
         %% 获取按某种顺序排列的风机索引列表
         function sorted_indexes=get_ordered_turbines(obj)
+            wind_direction=encase180(obj.wind_direction_real-270);
             bd=obj.bounds;
             center=[mean([bd(1),bd(2)])...
                    ,mean([bd(3),bd(4)]),0];
-            rotated_chart=obj.turbinechart.rotated(center,obj.wind_direction);
+            rotated_chart=obj.turbinechart.rotated(center,wind_direction);
             sorted_chart=obj.turbinechart.sortinx(rotated_chart);
             [~,~,sorted_indexes]=extract_features_tc(sorted_chart);
         end
