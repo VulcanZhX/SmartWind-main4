@@ -67,7 +67,7 @@ classdef Turbine < handle
         comprehensive_fatigue_coefficient
         single_turbine_objective
         single_turbine_generation
-        
+        single_turbine_loss
     end
 
     methods
@@ -102,7 +102,8 @@ classdef Turbine < handle
                 obj.repair_c=repair_c_vector(3);
             end
 
-       
+            obj.rated_power = obj.rated_power * 1e6; % MW unit conversion
+            
         % % category_map = zeros(1, max_count_tn);
         % % category_map(t_qz_12) = 1;
         % % category_map(t_qz_3_1) = 2;
@@ -153,11 +154,11 @@ classdef Turbine < handle
 %% 确定当前风速下对应的功率系数，基于表数据的线性插值
         function cp = fCp(obj,at_wind_speed)
             switch obj.rated_power
-                case 11
+                case 11*1e6
                     power_thrust_table = obj.power_thrust_table_11;
-                case 6.8
+                case 6.8*1e6
                     power_thrust_table = obj.power_thrust_table_68;
-                case 8.3
+                case 8.3*1e6
                     power_thrust_table = obj.power_thrust_table_83;
             end
 
@@ -173,11 +174,11 @@ classdef Turbine < handle
 %% 确定当前风速下对应的推力系数，基于表数据的线性插值，功率为0，推力系数不为0
         function ct = fCt(obj,at_wind_speed)
             switch obj.rated_power
-                case 11
+                case 11*1e6
                     power_thrust_table = obj.power_thrust_table_11;
-                case 6.8
+                case 6.8*1e6
                     power_thrust_table = obj.power_thrust_table_68;
-                case 8.3
+                case 8.3*1e6
                     power_thrust_table = obj.power_thrust_table_83;
             end
             ct_column=power_thrust_table(:,3);
@@ -313,10 +314,10 @@ classdef Turbine < handle
         function comprehensive_fatigue_coefficient=get.comprehensive_fatigue_coefficient(obj)
             % 累计疲劳系数
             accumulated_c=obj.consumed_comprehensive_fatigue_coefficient;
-
+            life_total_yr = obj.life_total/(365*86400); % 将寿命转换为年
             % 待优化的疲劳系数
-            optimized_c_power=obj.power*obj.delta_t/(obj.rated_power*obj.life_total*(1+obj.repair_c));
-            optimized_c_turbulence=1.5*obj.turbulence*obj.delta_t/(obj.ref_turbulence*obj.life_total*(1+obj.repair_c));
+            optimized_c_power=obj.power*obj.delta_t/(obj.rated_power*life_total_yr*(1+obj.repair_c));
+            optimized_c_turbulence=1.5*obj.turbulence*obj.delta_t/(obj.ref_turbulence*life_total_yr*(1+obj.repair_c));
             optimized_c=optimized_c_power+optimized_c_turbulence;
 
             % 剩余寿命比
@@ -335,6 +336,11 @@ classdef Turbine < handle
             %%尽可能最大化1)正常所有风机的发电量+2)由各机组寿命优化折算得到的发电量的总和
                  single_turbine_generation=obj.power*obj.optimization_period;
 
+        end
+
+        %% 单机寿命折损的发电量(Extras)
+        function single_turbine_loss=get.single_turbine_loss(obj)
+            single_turbine_loss=obj.annual_average_power*(obj.comprehensive_fatigue_coefficient-obj.past_comprehensive_fatigue_coefficient)*obj.optimization_period;
         end
 
 

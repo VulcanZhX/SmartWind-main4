@@ -1,0 +1,122 @@
+clc
+clear
+
+load("yawopt_main_maxpower_vars_vd.mat");
+% load("vdmax_tracking_life_data/yawopt_main_maxpower_vars_vd_105_270_6_9.mat")
+% load("./vdmax_tracking_life_data/yawopt_main_maxpower_vars_vd_285_345_6_9.mat");
+% winddirection_parallel = 0:15:90; % 0, 15, 30, ..., 90 degrees
+windspeed_parallel = 6:9; % 6, 7, 8, 9 m/s
+% winddirection_parallel = 105:15:270; % + 105, ..., 270 degrees
+% winddirection_parallel = 285:15:345; % + 285, ..., 345 degrees
+winddirection_parallel = 0:15:90; % +0, 15, 30, ..., 90 degrees
+yaw_track_arr = cell(length(windspeed_parallel)*length(winddirection_parallel), 1);
+power_track_arr = cell(length(windspeed_parallel)*length(winddirection_parallel), 1);
+p12_track_arr = cell(length(windspeed_parallel)*length(winddirection_parallel), 1);
+p3_track_arr = cell(length(windspeed_parallel)*length(winddirection_parallel), 1);
+
+% construct power agc
+power_agc12_cellarr = p12_max_cellarr;
+power_agc3_cellarr = p3_max_cellarr;
+
+for id = 1:length(windspeed_parallel)*length(winddirection_parallel)
+    power_agc12_cellarr{id} = 0.985 * p12_max_cellarr{id};
+    power_agc3_cellarr{id} = 0.98 * p3_max_cellarr{id};
+end
+
+% initialize parallel pool with the number of wind speeds
+delete(gcp('nocreate'))
+parpool('local', length(windspeed_parallel)*length(winddirection_parallel));
+tic
+parfor ind_vel = 1:length(windspeed_parallel)*length(winddirection_parallel)
+    yaw_track_arr{ind_vel} = swi_cellarr{ind_vel}.yaw_optimization_pso_gb_tracking(power_agc12_cellarr{ind_vel}, ...
+        power_agc3_cellarr{ind_vel});
+end
+fprintf("elapsed time for yaw tracking: %.2f seconds\n", toc);
+
+% record tracking results
+for ind_vel = 1:length(windspeed_parallel)*length(winddirection_parallel)
+    swi_cellarr{ind_vel}.set_yaw_angles(yaw_track_arr{ind_vel});
+    swi_cellarr{ind_vel}.calculate_wake();
+    power_track_arr{ind_vel} = swi_cellarr{ind_vel}.get_farm_power();
+    p12_track_arr{ind_vel} = swi_cellarr{ind_vel}.get_farm_qingzhou12_power();
+    p3_track_arr{ind_vel} = swi_cellarr{ind_vel}.get_farm_qingzhou3_power();
+end
+
+% display average tracking error
+p12_track_mat = cell2mat(p12_track_arr);
+p3_track_mat = cell2mat(p3_track_arr);
+p12_agc_mat = cell2mat(power_agc12_cellarr);
+p3_agc_mat = cell2mat(power_agc3_cellarr);
+p_all_agc_mat = p12_agc_mat + p3_agc_mat;
+p_all_track_mat = p12_track_mat + p3_track_mat;
+
+fprintf("青州12风场功率跟踪误差: %.2fW\n", ... 
+    mean(abs(p12_track_mat - p12_agc_mat)));
+fprintf("青州3风场功率跟踪误差: %.2fW\n", ... 
+    mean(abs(p3_track_mat - p3_agc_mat)));
+fprintf("场群跟踪误差: %.2fW\n", ... 
+    mean(abs(p_all_track_mat - p_all_agc_mat)));
+
+
+% save results
+% save('yaw_tracking_results.mat', "swi_cellarr", "yaw_track_arr", "power_track_arr", ...
+%    "p12_track_arr", "p3_track_arr", "power_agc12_cellarr", "power_agc3_cellarr");
+
+% save('./vdmax_tracking_life_data/yaw_tracking_results_vd_105_270_6_9.mat', ...
+%     "swi_cellarr", "yaw_track_arr", "power_track_arr", ...
+%     "p12_track_arr", "p3_track_arr", "power_agc12_cellarr", "power_agc3_cellarr");
+
+save('yaw_tracking_results_vd_demo_0_90.mat', ...
+    "swi_cellarr", "yaw_track_arr", "power_track_arr", ...
+    "p12_track_arr", "p3_track_arr", "power_agc12_cellarr", "power_agc3_cellarr");
+
+%% Life Optimization
+
+yaw_lifecell_arr = cell(length(windspeed_parallel) * length(winddirection_parallel), 1);
+power_lifecell_arr = cell(length(windspeed_parallel) * length(winddirection_parallel), 1);
+
+loss_org = cell(length(windspeed_parallel) * length(winddirection_parallel), 1);
+loss_opt = cell(length(windspeed_parallel) * length(winddirection_parallel), 1);
+
+for ind_vel = 1:length(windspeed_parallel) * length(winddirection_parallel)
+    loss_org{ind_vel} = swi_cellarr{ind_vel}.get_farm_loss();
+end
+
+tic
+parfor ind_vel = 1:length(windspeed_parallel) * length(winddirection_parallel)
+    yaw_lifecell_arr{ind_vel} = swi_cellarr{ind_vel}.yaw_pso_life_optimization( ...
+        power_agc12_cellarr{ind_vel}, power_agc3_cellarr{ind_vel});
+end
+toc
+
+for ind_vel = 1:length(windspeed_parallel) * length(winddirection_parallel)
+    swi_cellarr{ind_vel}.set_yaw_angles(yaw_lifecell_arr{ind_vel});
+    swi_cellarr{ind_vel}.calculate_wake();
+    power_lifecell_arr{ind_vel} = swi_cellarr{ind_vel}.get_farm_power();
+    loss_opt{ind_vel} = swi_cellarr{ind_vel}.get_farm_loss();
+end
+
+
+% display fatigue_coefficient average optimization results
+loss_relative_mat = cell2mat(loss_opt) ./ cell2mat(loss_org);
+fprintf("寿命系数平均优化百分比: %.2f%%\n", ...
+    100*(1-mean(loss_relative_mat)));
+power_life_mat = cell2mat(power_lifecell_arr);
+fprintf("平均功率跟踪误差: %.2fW\n", ...
+    mean(abs(power_life_mat - p_all_agc_mat)));
+fprintf("寿命系数方差减小百分比：%.2f%%\n", ...
+    100 * (var(cell2mat(loss_org)) - var(cell2mat(loss_opt))) / var(cell2mat(loss_org)));
+
+% save('yaw_tracking_life_vd_avg.mat', "loss_org", "loss_opt", "power_lifecell_arr", "power_track_arr",  "power_agc12_cellarr", ...
+%     "power_agc3_cellarr", "yaw_lifecell_arr", "yaw_track_arr", "swi_cellarr");
+
+% save('yaw_tracking_life_vd.mat', "loss_org", "loss_opt", "power_lifecell_arr", "power_track_arr", "power_agc12_cellarr", ...
+%     "power_agc3_cellarr", "yaw_lifecell_arr", "yaw_track_arr", "swi_cellarr");
+
+% save('./vdmax_tracking_life_data/yaw_tracking_life_vd_avg_105_270_6_9.mat', ...
+%     "loss_org", "loss_opt", "power_lifecell_arr", "power_track_arr", "power_agc12_cellarr", ...
+%     "power_agc3_cellarr", "yaw_lifecell_arr", "yaw_track_arr", "swi_cellarr");
+
+save('yaw_tracking_life_vd_avg_demo_0_90.mat', ... 
+    "loss_org", "loss_opt", "power_lifecell_arr", "power_track_arr", "power_agc12_cellarr", ...
+    "power_agc3_cellarr", "yaw_lifecell_arr", "yaw_track_arr", "swi_cellarr");
